@@ -1,605 +1,548 @@
 <!DOCTYPE html>
 <html lang="th">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Fantasy 3D - Fixed Dash Direction</title>
-    <style>
-        @import url('https://fonts.googleapis.com/css2?family=Kanit:wght@400;600;800&display=swap');
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Nmpfolio - ระบบสร้างและจัดการพอร์ตฟอลิโอ TCAS</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Google Fonts: Prompt & Sarabun -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Prompt:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&family=Sarabun:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <!-- FontAwesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 
-        * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; }
-        body { background-color: #000; color: #fff; font-family: 'Kanit', sans-serif; overflow: hidden; width: 100vw; height: 100vh; }
-        #canvas-container { width: 100%; height: 100%; position: absolute; top: 0; left: 0; z-index: 1; }
-        
-        .hud-layer {
-            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-            z-index: 10; pointer-events: none; display: flex; flex-direction: column;
-            justify-content: space-between; padding: 15px;
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Prompt', 'Sarabun', 'sans-serif'],
+          },
+          colors: {
+            nmp: {
+              50: '#f0f7ff',
+              100: '#e0effe',
+              500: '#2563eb',
+              600: '#1d4ed8',
+              700: '#1e40af',
+              800: '#1e3a8a',
+              accent: '#f59e0b',
+            }
+          }
         }
-        .interactive { pointer-events: auto; }
+      }
+    }
+  </script>
 
-        .player-info-box {
-            display: flex; align-items: center; gap: 12px;
-            background: rgba(0, 0, 0, 0.6); border: 1px solid rgba(255, 255, 255, 0.2);
-            padding: 8px 15px; border-radius: 8px; width: fit-content;
-        }
-        .level-badge {
-            background: #e67e22; color: #fff; font-weight: 800; border-radius: 50%;
-            width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; font-size: 1.1rem;
-        }
-        .bars-container { display: flex; flex-direction: column; gap: 4px; width: 160px; }
-        .bar-bg { height: 10px; background: rgba(0, 0, 0, 0.6); border-radius: 5px; overflow: hidden; border: 1px solid rgba(255, 255, 255, 0.1); }
-        .hp-fill { width: 100%; height: 100%; background: linear-gradient(90deg, #e74c3c, #2ecc71); transition: width 0.15s; }
-        .exp-fill { width: 0%; height: 100%; background: #3498db; transition: width 0.15s; }
+  <style>
+    /* Custom Scrollbar */
+    ::-webkit-scrollbar { width: 8px; }
+    ::-webkit-scrollbar-track { background: #f1f5f9; }
+    ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+    ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
 
-        .quest-tracker {
-            position: absolute; top: 15px; right: 15px;
-            background: rgba(0, 0, 0, 0.75); border-left: 4px solid #f1c40f;
-            padding: 12px 15px; border-radius: 6px; font-size: 0.85rem; min-width: 280px;
-        }
-        .quest-header { color: #f1c40f; font-weight: 800; margin-bottom: 8px; border-bottom: 1px solid rgba(241, 196, 15, 0.3); padding-bottom: 4px; }
-        .quest-item { margin-bottom: 6px; font-size: 0.8rem; color: #ddd; padding: 4px 6px; border-radius: 4px; background: rgba(255, 255, 255, 0.05); }
-        .quest-item.completed { color: #2ecc71; text-decoration: line-through; background: transparent; }
+    /* Theme Variables */
+    :root {
+      --primary-color: #1d4ed8;
+      --primary-gradient: linear-gradient(135deg, #0f172a 0%, #1e3a8a 50%, #0f172a 100%);
+      --accent-color: #f59e0b;
+    }
 
-        .boss-hp-box {
-            position: absolute; top: 15px; left: 50%; transform: translateX(-50%);
-            width: 380px; background: rgba(0, 0, 0, 0.75); border: 2px solid #e74c3c;
-            padding: 8px 15px; border-radius: 6px; text-align: center; box-shadow: 0 0 20px rgba(231, 76, 60, 0.8);
-        }
-        .boss-name { font-size: 0.95rem; font-weight: 800; color: #ff4757; margin-bottom: 4px; text-transform: uppercase; }
-        .boss-hp-fill { width: 100%; height: 12px; background: #ff4757; border-radius: 3px; transition: width 0.1s; }
+    .theme-blue {
+      --primary-color: #1d4ed8;
+      --primary-gradient: linear-gradient(135deg, #0f172a 0%, #1e3a8a 50%, #0f172a 100%);
+      --accent-color: #f59e0b;
+    }
+    .theme-red {
+      --primary-color: #dc2626;
+      --primary-gradient: linear-gradient(135deg, #450a0a 0%, #991b1b 50%, #450a0a 100%);
+      --accent-color: #fbbf24;
+    }
+    .theme-purple {
+      --primary-color: #7c3aed;
+      --primary-gradient: linear-gradient(135deg, #2e1065 0%, #5b21b6 50%, #2e1065 100%);
+      --accent-color: #f43f5e;
+    }
+    .theme-green {
+      --primary-color: #059669;
+      --primary-gradient: linear-gradient(135deg, #064e3b 0%, #065f46 50%, #064e3b 100%);
+      --accent-color: #f59e0b;
+    }
 
-        .minimap-container {
-            position: absolute; bottom: 20px; left: 20px; width: 130px; height: 130px;
-            border-radius: 50%; border: 3px solid rgba(255, 255, 255, 0.5);
-            background: rgba(20, 30, 20, 0.6); overflow: hidden;
-        }
-        #minimap-canvas { width: 100%; height: 100%; }
+    /* Print Styles for A4 Output */
+    @media print {
+      body {
+        background: white !important;
+        padding: 0 !important;
+      }
+      .no-print {
+        display: none !important;
+      }
+      .print-area {
+        margin: 0 !important;
+        padding: 0 !important;
+        box-shadow: none !important;
+        width: 100% !important;
+      }
+      .page-break {
+        page-break-after: always;
+        break-after: page;
+      }
+      * {
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+      }
+    }
 
-        .skill-bar { position: absolute; bottom: 20px; right: 20px; display: flex; gap: 10px; }
-        .skill-btn {
-            width: 55px; height: 55px; border-radius: 50%; background: rgba(0, 0, 0, 0.6);
-            border: 2px solid rgba(255, 255, 255, 0.4); display: flex; flex-direction: column;
-            align-items: center; justify-content: center; font-size: 1.2rem; cursor: pointer;
-        }
-        .skill-btn.active { border-color: #f1c40f; box-shadow: 0 0 12px #f1c40f; }
-        .skill-key { font-size: 0.65rem; color: #aaa; margin-top: -2px; }
+    .a4-page {
+      width: 100%;
+      min-height: 297mm;
+      background: white;
+      box-sizing: border-box;
+      position: relative;
+    }
 
-        .modal-overlay {
-            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0, 0, 0, 0.75); z-index: 100; display: flex; align-items: center; justify-content: center;
-        }
-        .quiz-card { background: #1e272e; border: 2px solid #f1c40f; border-radius: 12px; padding: 24px; width: 90%; max-width: 500px; }
-        .quiz-title { color: #f1c40f; font-size: 1.1rem; font-weight: 800; margin-bottom: 12px; }
-        .quiz-question { font-size: 0.95rem; margin-bottom: 16px; line-height: 1.4; color: #fff; }
-        .quiz-options { display: flex; flex-direction: column; gap: 10px; }
-        .quiz-opt-btn {
-            background: rgba(255, 255, 255, 0.08); border: 1px solid rgba(255, 255, 255, 0.2);
-            padding: 10px 14px; border-radius: 6px; color: #fff; text-align: left;
-            font-family: 'Kanit', sans-serif; font-size: 0.85rem; cursor: pointer;
-        }
-        .quiz-opt-btn:hover { background: rgba(241, 196, 15, 0.2); border-color: #f1c40f; }
-        .hidden { display: none !important; }
-
-        .status-effect {
-            position: absolute; top: 70px; left: 20px; background: rgba(231, 76, 60, 0.8);
-            padding: 4px 10px; border-radius: 4px; font-size: 0.8rem; font-weight: bold;
-        }
-    </style>
+    .theme-bg-gradient {
+      background: var(--primary-gradient);
+    }
+    .theme-text-primary {
+      color: var(--primary-color);
+    }
+    .theme-bg-primary {
+      background-color: var(--primary-color);
+    }
+    .theme-border-primary {
+      border-color: var(--primary-color);
+    }
+  </style>
 </head>
-<body>
+<body class="bg-slate-100 font-sans text-slate-800 antialiased min-h-screen flex flex-col theme-blue">
 
-    <div id="canvas-container"></div>
+  <!-- Top Navigation Header (No Print) -->
+  <header class="no-print bg-slate-900 text-white sticky top-0 z-50 shadow-md">
+    <div class="max-w-7xl mx-auto px-4 py-3 flex flex-wrap justify-between items-center gap-4">
+      <div class="flex items-center space-x-3">
+        <div class="bg-gradient-to-r from-blue-600 to-indigo-600 text-white px-3 py-1.5 rounded-xl font-bold text-xl tracking-wider flex items-center gap-2 shadow-sm">
+          <i class="fa-solid fa-folder-open text-amber-400"></i>
+          <span>Nmp<span class="text-amber-400">folio</span></span>
+        </div>
+        <span class="text-xs bg-slate-800 text-slate-300 px-3 py-1 rounded-full border border-slate-700 hidden sm:inline-block">
+          ระบบสร้างพอร์ตฟอลิโอมืออาชีพ TCAS
+        </span>
+      </div>
 
-    <div class="hud-layer">
-        <div class="player-info-box interactive">
-            <div class="level-badge" id="ui-level">1</div>
-            <div class="bars-container">
-                <div class="bar-bg"><div id="ui-hp" class="hp-fill"></div></div>
-                <div class="bar-bg"><div id="ui-exp" class="exp-fill"></div></div>
-            </div>
+      <!-- Actions & Theme Controls -->
+      <div class="flex items-center space-x-2 sm:space-x-3">
+        <!-- Palette Selector -->
+        <div class="hidden sm:flex items-center space-x-1.5 bg-slate-800 p-1.5 rounded-lg border border-slate-700 mr-2">
+          <span class="text-xs text-slate-400 mr-1 pl-1">ธีม:</span>
+          <button onclick="setTheme('theme-blue')" class="w-5 h-5 rounded-full bg-blue-600 ring-2 ring-white/20 hover:scale-110 transition" title="น้ำเงิน-ทอง"></button>
+          <button onclick="setTheme('theme-red')" class="w-5 h-5 rounded-full bg-red-600 ring-2 ring-white/20 hover:scale-110 transition" title="แดง-เหลือง"></button>
+          <button onclick="setTheme('theme-purple')" class="w-5 h-5 rounded-full bg-purple-600 ring-2 ring-white/20 hover:scale-110 transition" title="ม่วง-ชมพู"></button>
+          <button onclick="setTheme('theme-green')" class="w-5 h-5 rounded-full bg-emerald-600 ring-2 ring-white/20 hover:scale-110 transition" title="เขียว-ส้ม"></button>
         </div>
 
-        <div id="status-box" class="status-effect hidden">❄️ ติดสถานะสโลว์ (Slowed)</div>
-
-        <div class="quest-tracker">
-            <div class="quest-header">📍 ภารกิจเดินไปที่เสาเควส (3 จุด)</div>
-            <div id="quest-list-container"></div>
-        </div>
-
-        <div id="boss-hud" class="boss-hp-box">
-            <div class="boss-name" id="boss-title">🛡️ TITAN GOLEM [Lv. 1] 🛡️</div>
-            <div class="bar-bg"><div id="ui-boss-hp" class="boss-hp-fill"></div></div>
-        </div>
-
-        <div class="minimap-container">
-            <canvas id="minimap-canvas" width="130" height="130"></canvas>
-        </div>
-
-        <div class="skill-bar interactive">
-            <div class="skill-btn active" onclick="playerAttack()">⚔️<span class="skill-key">คลิกซ้าย</span></div>
-            <div class="skill-btn" onclick="useHeavyAttack()">💥<span class="skill-key">[ E ]</span></div>
-            <div class="skill-btn" onclick="dash()">💨<span class="skill-key">[ Shift ]</span></div>
-        </div>
-    </div>
-
-    <div id="quiz-modal" class="modal-overlay hidden">
-        <div class="quiz-card">
-            <div class="quiz-title" id="quiz-modal-title">เสาเควสทดสอบความรู้</div>
-            <div class="quiz-question" id="quiz-modal-q">คำถาม...</div>
-            <div class="quiz-options" id="quiz-modal-options"></div>
-        </div>
-    </div>
-
-    <script src="https://unpkg.com/three@0.128.0/build/three.min.js"></script>
-
-    <script>
-        const playerState = { hp: 300, maxHp: 300, exp: 0, maxExp: 100, level: 1, atk: 50, isAttacking: false, dashCooldown: false, speedModifier: 1 };
-        const bossState = { level: 1, hp: 1800, maxHp: 1800, atk: 45, speed: 3.5, attackTimer: 0, skillTimer: 0 };
-
-        const quizQuestPool = [
-            { id: 1, topic: "ความรู้ดิจิทัล", q: "หากได้รับ SMS แจ้งว่า บัญชีธนาคารถูกล็อก พร้อมแนบลิงก์ให้กด ควรทำอย่างไร?", opts: ["กดลิงก์ทันที", "ลบข้อความ หรือโทรสอบถามศูนย์บริการหลัก", "ส่งต่อให้เพื่อน"], ans: 1 },
-            { id: 2, topic: "การป้องกันตนเอง", q: "การตั้งรหัสผ่าน (Password) ข้อใดรัดกุมและปลอดภัยที่สุด?", opts: ["12345678", "วันเดือนปีเกิด", "ผสมอักษรใหญ่ เล็ก ตัวเลข และสัญลักษณ์"], ans: 2 },
-            { id: 3, topic: "การเคารพผู้อื่น", q: "เห็นรูปหลุดตลกๆ ของเพื่อนในกลุ่มปิด ควรทำอย่างไร?", opts: ["แคปหน้าจอไปโพสต์ประจาน", "ไม่แชร์ต่อ และตักเตือนเพื่อนที่ส่งรูปมา", "กดแชร์สาธารณะ"], ans: 1 },
-            { id: 4, topic: "ความเป็นส่วนตัว", q: "ข้อใด ไม่ควร โพสต์ลงบนสื่อสังคมออนไลน์สาธารณะ?", opts: ["บัตรประชาชน หรือบัตรนักเรียน", "รูปวิวทิวทัศน์", "รีวิวอาหาร"], ans: 0 },
-            { id: 5, topic: "ความรู้ดิจิทัล", q: "Phishing หมายถึงภัยคุกคามไซเบอร์รูปแบบใด?", opts: ["ส่งไวรัสผ่านแฟลชไดรฟ์", "สร้างเว็บ/อีเมลหลอกลวงเพื่อขโมยข้อมูล", "แฮกบลูทูธ"], ans: 1 },
-            { id: 6, topic: "การเคารพผู้อื่น", q: "หากพบเห็นการ Cyberbullying ควรปฏิบัติตนอย่างไร?", opts: ["ร่วมด่าทอด้วย", "กด Report บัญชีผู้ระราน และไม่ส่งต่อ", "ช่วยแชร์กระจายข่าว"], ans: 1 },
-            { id: 7, topic: "การป้องกันตนเอง", q: "การเปิดใช้งาน 2FA มีประโยชน์อย่างไร?", opts: ["ทำให้เน็ตเร็วขึ้น", "เพิ่มความปลอดภัยอีกชั้นแม้ถูกรู้รหัสผ่าน", "ประหยัดแบตเตอรี่"], ans: 1 },
-            { id: 8, topic: "ความรู้ดิจิทัล", q: "Digital Footprint หมายถึงสิ่งใด?", opts: ["ประวัติการใช้งานและกิจกรรมออนไลน์ของเรา", "แอปนับก้าวเดิน", "อุปกรณ์แท็บเล็ต"], ans: 0 },
-            { id: 9, topic: "การเคารพตนเอง", q: "โดนคนแปลกหน้าคอมเมนต์ด่าทอด้วยคำรุนแรง ควรทำอย่างไร?", opts: ["ด่ากลับแรงกว่า", "บล็อก รายงานระบบ และไม่ให้ค่า", "โพสต์เรียกร้องความสนใจ"], ans: 1 },
-            { id: 10, topic: "ความเป็นส่วนตัว", q: "ใช้ Wi-Fi สาธารณะ ข้อใดปลอดภัยที่สุด?", opts: ["โอนเงินทำธุรกรรม", "เลี่ยงเข้าเว็บสำคัญหรือเปิด VPN", "โหลดไฟล์แปลกๆ"], ans: 1 }
-        ];
-
-        let activeQuizQuests = [];
-        let activeCheckpointIndex = -1;
-        let obstacles = [];
-        const traps = [];
-
-        // Scene Setup
-        const container = document.getElementById('canvas-container');
-        const scene = new THREE.Scene();
-        scene.background = new THREE.Color(0x1a252f);
-        scene.fog = new THREE.FogExp2(0x1a252f, 0.007);
-
-        const camera = new THREE.PerspectiveCamera(55, window.innerWidth / window.innerHeight, 0.1, 1000);
-        const renderer = new THREE.WebGLRenderer({ antialias: true });
-        renderer.setSize(window.innerWidth, window.innerHeight);
-        renderer.shadowMap.enabled = true;
-        container.appendChild(renderer.domElement);
-
-        scene.add(new THREE.AmbientLight(0xffffff, 0.4));
-        const dirLight = new THREE.DirectionalLight(0xfffaed, 0.8);
-        dirLight.position.set(80, 120, 60);
-        scene.add(dirLight);
-
-        // Ground
-        const ground = new THREE.Mesh(
-            new THREE.PlaneGeometry(320, 320),
-            new THREE.MeshStandardMaterial({ color: 0x1e272e, roughness: 0.9 })
-        );
-        ground.rotation.x = -Math.PI / 2;
-        scene.add(ground);
-
-        // Build Obstacles & Traps
-        function generateObstaclesAndTraps() {
-            const rockMat = new THREE.MeshStandardMaterial({ color: 0x485460 });
-            const trunkMat = new THREE.MeshStandardMaterial({ color: 0x3d1e6d });
-            const leavesMat = new THREE.MeshStandardMaterial({ color: 0x05c46b });
-            const trapMat = new THREE.MeshBasicMaterial({ color: 0xff3f34, wireframe: true });
-
-            for (let i = 0; i < 90; i++) {
-                const x = (Math.random() - 0.5) * 230;
-                const z = (Math.random() - 0.5) * 230;
-                if (Math.hypot(x, z) < 15 || Math.hypot(x, z + 50) < 15) continue;
-
-                if (Math.random() > 0.4) {
-                    const tree = new THREE.Group();
-                    const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.7, 1, 4.5), trunkMat); trunk.position.y = 2.25; tree.add(trunk);
-                    const leaves = new THREE.Mesh(new THREE.ConeGeometry(3.2, 7, 6), leavesMat); leaves.position.y = 6; tree.add(leaves);
-                    tree.position.set(x, 0, z);
-                    scene.add(tree);
-                    obstacles.push({ x, z, radius: 2.0, mesh: tree });
-                } else {
-                    const size = 1.8 + Math.random() * 2.5;
-                    const rock = new THREE.Mesh(new THREE.DodecahedronGeometry(size, 1), rockMat);
-                    rock.position.set(x, size / 2, z);
-                    scene.add(rock);
-                    obstacles.push({ x, z, radius: size * 0.95, mesh: rock });
-                }
-            }
-
-            for (let i = 0; i < 20; i++) {
-                const x = (Math.random() - 0.5) * 210;
-                const z = (Math.random() - 0.5) * 210;
-                if (Math.hypot(x, z) < 15) continue;
-
-                const trapMesh = new THREE.Mesh(new THREE.TorusGeometry(1.5, 0.2, 8, 16), trapMat);
-                trapMesh.rotation.x = Math.PI / 2;
-                trapMesh.position.set(x, 0.1, z);
-                scene.add(trapMesh);
-                traps.push({ x, z, radius: 1.5 });
-            }
-        }
-        generateObstaclesAndTraps();
-
-        // Player Model
-        const playerGroup = new THREE.Group();
-        const armorMat = new THREE.MeshStandardMaterial({ color: 0x00d2d3 });
-        const torso = new THREE.Mesh(new THREE.BoxGeometry(0.9, 1.2, 0.6), armorMat); torso.position.y = 1.2; playerGroup.add(torso);
-        const head = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.6, 0.6), armorMat); head.position.y = 2.1; playerGroup.add(head);
-        const leftArm = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.9, 0.3), armorMat); leftArm.position.set(-0.65, 1.2, 0); playerGroup.add(leftArm);
-        const rightArm = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.9, 0.3), armorMat); rightArm.position.set(0.65, 1.2, 0); playerGroup.add(rightArm);
-        const leftLeg = new THREE.Mesh(new THREE.BoxGeometry(0.35, 0.7, 0.35), armorMat); leftLeg.position.set(-0.25, 0.35, 0); playerGroup.add(leftLeg);
-        const rightLeg = new THREE.Mesh(new THREE.BoxGeometry(0.35, 0.7, 0.35), armorMat); rightLeg.position.set(0.25, 0.35, 0); playerGroup.add(rightLeg);
-        const sword = new THREE.Mesh(new THREE.BoxGeometry(0.12, 1.8, 0.3), new THREE.MeshStandardMaterial({ color: 0xffc048 }));
-        sword.position.set(0, -0.4, -0.4); sword.rotation.x = Math.PI / 3; rightArm.add(sword);
-        scene.add(playerGroup);
-
-        // Heavy Boss Model
-        const bossGroup = new THREE.Group();
-        const golemMat = new THREE.MeshStandardMaterial({ color: 0x8e44ad, roughness: 0.3, metalness: 0.5 });
-        const bossBody = new THREE.Mesh(new THREE.DodecahedronGeometry(4.0, 1), golemMat); bossBody.position.y = 5.0; bossGroup.add(bossBody);
-        const bossHead = new THREE.Mesh(new THREE.BoxGeometry(1.8, 1.8, 1.8), new THREE.MeshBasicMaterial({ color: 0xf1c40f })); bossHead.position.y = 8.2; bossGroup.add(bossHead);
-        bossGroup.position.set(0, 0, -50);
-        scene.add(bossGroup);
-
-        // Boss Skill Visual Ring
-        const aoeRing = new THREE.Mesh(
-            new THREE.RingGeometry(0.1, 14, 32),
-            new THREE.MeshBasicMaterial({ color: 0xe74c3c, side: THREE.DoubleSide, transparent: true, opacity: 0 })
-        );
-        aoeRing.rotation.x = Math.PI / 2;
-        aoeRing.position.y = 0.2;
-        scene.add(aoeRing);
-
-        // Checkpoint Monoliths
-        const checkpointGroup = new THREE.Group();
-        scene.add(checkpointGroup);
-
-        function generateRandom3QuizQuests() {
-            checkpointGroup.clear();
-            const shuffled = [...quizQuestPool].sort(() => 0.5 - Math.random());
-
-            activeQuizQuests = shuffled.slice(0, 3).map((q, idx) => {
-                const angle = (idx / 3) * Math.PI * 2 + Math.random();
-                const dist = 35 + Math.random() * 45;
-                const pos = new THREE.Vector3(Math.cos(angle) * dist, 0, Math.sin(angle) * dist);
-
-                const pillarGeo = new THREE.CylinderGeometry(0.8, 1, 6, 8);
-                const pillarMat = new THREE.MeshStandardMaterial({ color: 0xf1c40f, emissive: 0xf1c40f, emissiveIntensity: 0.8 });
-                const pillar = new THREE.Mesh(pillarGeo, pillarMat);
-                pillar.position.set(pos.x, 3, pos.z);
-
-                pillar.userData = { questIndex: idx };
-                checkpointGroup.add(pillar);
-
-                return { ...q, pos, completed: false, pillarMesh: pillar };
-            });
-
-            renderQuizQuestsUI();
-        }
-
-        function renderQuizQuestsUI() {
-            const container = document.getElementById('quest-list-container');
-            container.innerHTML = '';
-            activeQuizQuests.forEach((q, idx) => {
-                const div = document.createElement('div');
-                div.className = `quest-item ${q.completed ? 'completed' : ''}`;
-                div.innerHTML = `${idx + 1}. <b>[${q.topic}]</b> ${q.completed ? '✅ สำเร็จ' : '🏃 เดินไปที่เสาเควส'}`;
-                container.appendChild(div);
-            });
-        }
-
-        function checkCheckpointCollision() {
-            if (!document.getElementById('quiz-modal').classList.contains('hidden')) return;
-            activeQuizQuests.forEach((q, idx) => {
-                if (!q.completed && playerGroup.position.distanceTo(q.pos) < 3.2) {
-                    openQuizModal(idx);
-                }
-            });
-        }
-
-        function openQuizModal(index) {
-            activeCheckpointIndex = index;
-            const q = activeQuizQuests[index];
-            document.getElementById('quiz-modal-title').innerText = `📍 เสาเควสที่ ${index + 1}: ${q.topic}`;
-            document.getElementById('quiz-modal-q').innerText = q.q;
-
-            const optsBox = document.getElementById('quiz-modal-options');
-            optsBox.innerHTML = '';
-            q.opts.forEach((optText, oIdx) => {
-                const btn = document.createElement('button');
-                btn.className = 'quiz-opt-btn';
-                btn.innerText = `${oIdx + 1}. ${optText}`;
-                btn.onclick = () => answerQuiz(oIdx);
-                optsBox.appendChild(btn);
-            });
-
-            document.getElementById('quiz-modal').classList.remove('hidden');
-        }
-
-        function answerQuiz(selectedOpt) {
-            const q = activeQuizQuests[activeCheckpointIndex];
-            document.getElementById('quiz-modal').classList.add('hidden');
-
-            if (selectedOpt === q.ans) {
-                alert("✨ ถูกต้อง! เสาเควสปลดล็อก พลังโจมตีเพิ่มขึ้นอย่างมาก!");
-                q.completed = true;
-                q.pillarMesh.material.color.setHex(0x2ecc71);
-                q.pillarMesh.material.emissive.setHex(0x2ecc71);
-                playerState.atk += 35;
-                addExp(50);
-                renderQuizQuestsUI();
-            } else {
-                alert("❌ คำตอบผิด! ถอยออกไปแล้วลองเข้ามาใหม่");
-            }
-        }
-
-        // Key Controls
-        const keys = { w: false, a: false, s: false, d: false };
-        let mouseX = 0, mouseY = 0, isMouseDown = false;
-        let camAngleX = 0, camAngleY = 0.3;
-
-        window.addEventListener('keydown', (e) => {
-            const k = e.key.toLowerCase();
-            if (k in keys) keys[k] = true;
-            
-            if (e.key === 'Shift' || e.code.includes('Shift')) dash();
-            if (k === 'e') useHeavyAttack();
-            if (e.code === 'Space') playerAttack();
-        });
+        <button id="btn-edit-mode" onclick="setMode('edit')" class="px-3.5 py-2 rounded-lg text-xs sm:text-sm font-medium transition flex items-center gap-2 bg-blue-600 text-white shadow-sm">
+          <i class="fa-solid fa-pen-to-square"></i>
+          <span>แก้ไข</span>
+        </button>
         
-        window.addEventListener('keyup', (e) => {
-            const k = e.key.toLowerCase();
-            if (k in keys) keys[k] = false;
-        });
+        <button id="btn-preview-mode" onclick="setMode('preview')" class="px-3.5 py-2 rounded-lg text-xs sm:text-sm font-medium transition flex items-center gap-2 bg-slate-800 text-slate-300 hover:bg-slate-700">
+          <i class="fa-solid fa-eye"></i>
+          <span>พรีวิว</span>
+        </button>
 
-        window.addEventListener('mousedown', (e) => {
-            if (e.button === 0) playerAttack();
-            if (e.button === 2) { isMouseDown = true; mouseX = e.clientX; mouseY = e.clientY; }
-        });
-        window.addEventListener('mouseup', () => isMouseDown = false);
-        window.addEventListener('contextmenu', e => e.preventDefault());
-        window.addEventListener('mousemove', (e) => {
-            if (isMouseDown) {
-                camAngleX -= (e.clientX - mouseX) * 0.005;
-                camAngleY = Math.max(0.1, Math.min(1.2, camAngleY + (e.clientY - mouseY) * 0.005));
-                mouseX = e.clientX; mouseY = e.clientY;
-            }
-        });
+        <button onclick="saveToLocalStorage()" class="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-amber-400 border border-slate-700 rounded-lg text-xs sm:text-sm font-medium transition flex items-center gap-1.5">
+          <i class="fa-solid fa-floppy-disk"></i>
+          <span class="hidden md:inline">บันทึก</span>
+        </button>
 
-        // Player Actions
-        function playerAttack() {
-            if (playerState.isAttacking) return;
-            playerState.isAttacking = true;
-            rightArm.rotation.x = -Math.PI / 2;
+        <button onclick="window.print()" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs sm:text-sm font-medium transition flex items-center gap-2 shadow-sm">
+          <i class="fa-solid fa-file-pdf"></i>
+          <span>ส่งออก PDF</span>
+        </button>
+      </div>
+    </div>
+  </header>
 
-            if (playerGroup.position.distanceTo(bossGroup.position) < 8.0) {
-                bossState.hp = Math.max(0, bossState.hp - (playerState.atk + Math.floor(Math.random() * 20)));
-                document.getElementById('ui-boss-hp').style.width = `${(bossState.hp / bossState.maxHp) * 100}%`;
-                if (bossState.hp <= 0) onBossDefeated();
-            }
-            setTimeout(() => { rightArm.rotation.x = 0; playerState.isAttacking = false; }, 180);
-        }
+  <!-- Main Content Layout -->
+  <div class="max-w-7xl mx-auto w-full flex-1 p-4 lg:p-6 grid grid-cols-1 lg:grid-cols-12 gap-6">
 
-        function useHeavyAttack() {
-            if (playerState.isAttacking) return;
-            playerState.isAttacking = true;
-            rightArm.rotation.x = -Math.PI;
-            setTimeout(() => {
-                if (playerGroup.position.distanceTo(bossGroup.position) < 8.5) {
-                    bossState.hp = Math.max(0, bossState.hp - playerState.atk * 2.5);
-                    document.getElementById('ui-boss-hp').style.width = `${(bossState.hp / bossState.maxHp) * 100}%`;
-                    if (bossState.hp <= 0) onBossDefeated();
-                }
-                rightArm.rotation.x = 0; playerState.isAttacking = false;
-            }, 250);
-        }
+    <!-- EDIT PANEL (LEFT SIDEBAR) -->
+    <aside id="edit-panel" class="no-print lg:col-span-5 bg-white rounded-2xl shadow-sm border border-slate-200/80 p-5 overflow-y-auto max-h-[calc(100vh-90px)] sticky top-20">
+      
+      <div class="border-b border-slate-100 pb-4 mb-4 flex justify-between items-center">
+        <div>
+          <h2 class="text-lg font-bold text-slate-800 flex items-center gap-2">
+            <i class="fa-solid fa-sliders theme-text-primary"></i> จัดการข้อมูล Nmpfolio
+          </h2>
+          <p class="text-xs text-slate-500">กรอกข้อมูลเพื่ออัปเดตหน้าพอร์ตแบบ Real-time</p>
+        </div>
+      </div>
 
-        // ระบบการพุ่งที่แก้ไขทิศทางแล้ว
-        function dash() {
-            if (playerState.dashCooldown) return;
-            playerState.dashCooldown = true;
-            
-            let moveX = 0, moveZ = 0;
-            if (keys.w) moveZ -= 1;
-            if (keys.s) moveZ += 1;
-            if (keys.a) moveX -= 1;
-            if (keys.d) moveX += 1;
+      <!-- Accordion Form Sections -->
+      <div class="space-y-3">
+        
+        <!-- Section 1: หน้าปก & ข้อมูลส่วนตัว -->
+        <details class="group border border-slate-200 rounded-xl bg-slate-50/50" open>
+          <summary class="flex justify-between items-center p-3 font-semibold text-slate-700 cursor-pointer select-none group-open:text-blue-600 text-xs sm:text-sm">
+            <span class="flex items-center gap-2">
+              <i class="fa-solid fa-id-card text-blue-500 w-4"></i> 1. หน้าปก & ข้อมูลส่วนตัว
+            </span>
+            <i class="fa-solid fa-chevron-down text-xs transition-transform group-open:rotate-180"></i>
+          </summary>
+          <div class="p-4 bg-white border-t border-slate-200 rounded-b-xl space-y-3 text-xs">
+            <div>
+              <label class="block font-medium mb-1 text-slate-600">รูปถ่ายนักเรียน (โปรไฟล์)</label>
+              <input type="file" id="input-profile-img" accept="image/*" onchange="handleImageUpload(event, 'data-profile-img')" class="w-full text-xs text-slate-500 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100">
+            </div>
 
-            let dashDir = new THREE.Vector3(moveX, 0, moveZ);
-            
-            // ถ้าไม่ได้กดปุ่มเดิน ให้พุ่งไปตามหน้าตัวละคร
-            if (dashDir.length() === 0) {
-                dashDir.set(0, 0, -1).applyAxisAngle(new THREE.Vector3(0, 1, 0), playerGroup.rotation.y);
-            } else {
-                dashDir.normalize().applyAxisAngle(new THREE.Vector3(0, 1, 0), camAngleX);
-            }
+            <div class="grid grid-cols-2 gap-2">
+              <div>
+                <label class="block font-medium mb-1 text-slate-600">ชื่อ-นามสกุล (TH)</label>
+                <input type="text" id="input-fullname" value="นาย พัฒนศักดิ์ เรียนดี" oninput="updateField('fullname', this.value)" class="w-full p-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none">
+              </div>
+              <div>
+                <label class="block font-medium mb-1 text-slate-600">ชื่อ-นามสกุล (EN)</label>
+                <input type="text" id="input-fullname-en" value="Pattanasak Riandee" oninput="updateField('fullname-en', this.value)" class="w-full p-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none">
+              </div>
+            </div>
 
-            playerGroup.position.addScaledVector(dashDir, 10);
-            setTimeout(() => playerState.dashCooldown = false, 350);
-        }
+            <div class="grid grid-cols-2 gap-2">
+              <div>
+                <label class="block font-medium mb-1 text-slate-600">ชื่อเล่น</label>
+                <input type="text" id="input-nickname" value="นนท์" oninput="updateField('nickname', this.value)" class="w-full p-2 border rounded-lg focus:ring-2 focus:ring-blue-500">
+              </div>
+              <div>
+                <label class="block font-medium mb-1 text-slate-600">เกรดเฉลี่ยสะสม (GPAX)</label>
+                <input type="text" id="input-gpax" value="3.85" oninput="updateField('gpax', this.value)" class="w-full p-2 border rounded-lg focus:ring-2 focus:ring-blue-500 font-bold text-blue-600">
+              </div>
+            </div>
 
-        function onBossDefeated() {
-            addExp(250);
-            bossState.level++;
-            bossState.maxHp = Math.floor(bossState.maxHp * 1.6);
-            bossState.hp = bossState.maxHp;
-            bossState.atk = Math.floor(bossState.atk * 1.3);
-            bossState.speed += 0.4;
-            bossGroup.position.set(0, 0, -60);
+            <div>
+              <label class="block font-medium mb-1 text-slate-600">โรงเรียน</label>
+              <input type="text" id="input-school" value="โรงเรียนวิทยาศาสตร์นำไทย" oninput="updateField('school', this.value)" class="w-full p-2 border rounded-lg focus:ring-2 focus:ring-blue-500">
+            </div>
 
-            document.getElementById('boss-title').innerText = `🛡️ TITAN GOLEM [Lv. ${bossState.level}] 🛡️`;
-            document.getElementById('ui-boss-hp').style.width = `100%`;
+            <div>
+              <label class="block font-medium mb-1 text-slate-600">แผนการเรียน</label>
+              <input type="text" id="input-plan" value="วิทยาศาสตร์ - คณิตศาสตร์" oninput="updateField('plan', this.value)" class="w-full p-2 border rounded-lg focus:ring-2 focus:ring-blue-500">
+            </div>
 
-            generateRandom3QuizQuests();
-            alert(`🎉 ปราบบอสสำเร็จ!\n🛡️ บอสวิวัฒนาการเป็น [Lv. ${bossState.level}]\n📍 เสาเควสได้รับการสุ่มตำแหน่งใหม่!`);
-        }
+            <div class="p-3 bg-amber-50 rounded-lg border border-amber-200/60 space-y-2">
+              <span class="font-semibold text-amber-800 text-xs block">🎯 เป้าหมายการศึกษา (Target)</span>
+              <div>
+                <label class="block text-[11px] mb-0.5 text-slate-600">คณะที่อยากเข้า</label>
+                <input type="text" id="input-faculty" value="คณะวิศวกรรมศาสตร์ สาขาคอมพิวเตอร์" oninput="updateField('faculty', this.value)" class="w-full p-2 border rounded-lg focus:ring-2 focus:ring-amber-500">
+              </div>
+              <div>
+                <label class="block text-[11px] mb-0.5 text-slate-600">มหาวิทยาลัย</label>
+                <input type="text" id="input-university" value="จุฬาลงกรณ์มหาวิทยาลัย" oninput="updateField('university', this.value)" class="w-full p-2 border rounded-lg focus:ring-2 focus:ring-amber-500">
+              </div>
+            </div>
 
-        function addExp(amount) {
-            playerState.exp += amount;
-            if (playerState.exp >= playerState.maxExp) {
-                playerState.level++;
-                playerState.exp -= playerState.maxExp;
-                playerState.maxExp += 60;
-                playerState.maxHp += 50;
-                playerState.hp = playerState.maxHp;
-                playerState.atk += 20;
-                document.getElementById('ui-level').innerText = playerState.level;
-                document.getElementById('ui-hp').style.width = '100%';
-            }
-            document.getElementById('ui-exp').style.width = `${(playerState.exp / playerState.maxExp) * 100}%`;
-        }
+            <div>
+              <label class="block font-medium mb-1 text-slate-600">คติประจำใจ</label>
+              <textarea id="input-bio" rows="2" oninput="updateField('bio', this.value)" class="w-full p-2 border rounded-lg focus:ring-2 focus:ring-blue-500">มุ่งมั่นใช้เทคโนโลยีสร้างสรรค์นวัตกรรมเพื่อพัฒนาสังคม</textarea>
+            </div>
 
-        // Minimap
-        const minimapCanvas = document.getElementById('minimap-canvas');
-        const ctx = minimapCanvas.getContext('2d');
-        function drawMinimap() {
-            ctx.clearRect(0, 0, 130, 130);
-            const cx = 65, cy = 65, scale = 0.75;
+            <!-- ช่องทางติดต่อ -->
+            <div class="space-y-2 pt-2 border-t">
+              <span class="font-medium text-slate-700 block">ช่องทางการติดต่อ</span>
+              <div class="grid grid-cols-2 gap-2">
+                <input type="text" placeholder="เบอร์โทรศัพท์" id="input-phone" value="081-234-5678" oninput="updateField('phone', this.value)" class="p-1.5 border rounded">
+                <input type="text" placeholder="อีเมล" id="input-email" value="pattanasak@email.com" oninput="updateField('email', this.value)" class="p-1.5 border rounded">
+                <input type="text" placeholder="Line ID" id="input-line" value="@pattanasak_dev" oninput="updateField('line', this.value)" class="p-1.5 border rounded">
+                <input type="text" placeholder="Facebook/IG" id="input-social" value="Pattanasak Dev" oninput="updateField('social', this.value)" class="p-1.5 border rounded">
+              </div>
+            </div>
 
-            ctx.fillStyle = '#00d2d3'; ctx.beginPath(); ctx.arc(cx, cy, 4, 0, Math.PI * 2); ctx.fill();
+          </div>
+        </details>
 
-            const bX = (bossGroup.position.x - playerGroup.position.x) * scale;
-            const bZ = (bossGroup.position.z - playerGroup.position.z) * scale;
-            ctx.fillStyle = '#ff3f34'; ctx.beginPath(); ctx.arc(cx + bX, cy + bZ, 7, 0, Math.PI * 2); ctx.fill();
+        <!-- Section 2: เหตุผลที่อยากเข้าเรียน (Statement of Purpose) -->
+        <details class="group border border-slate-200 rounded-xl bg-slate-50/50">
+          <summary class="flex justify-between items-center p-3 font-semibold text-slate-700 cursor-pointer select-none group-open:text-blue-600 text-xs sm:text-sm">
+            <span class="flex items-center gap-2">
+              <i class="fa-solid fa-file-pen text-blue-500 w-4"></i> 2. แรงบันดาลใจ (SOP)
+            </span>
+            <i class="fa-solid fa-chevron-down text-xs transition-transform group-open:rotate-180"></i>
+          </summary>
+          <div class="p-4 bg-white border-t border-slate-200 rounded-b-xl space-y-3 text-xs">
+            <div>
+              <label class="block font-medium mb-1 text-slate-600">เรียงความ / เหตุผลที่เลือกเรียนสาขานี้</label>
+              <textarea id="input-sop" rows="6" oninput="updateField('sop', this.value)" class="w-full p-2 border rounded-lg focus:ring-2 focus:ring-blue-500 leading-relaxed">กระผมมีความสนใจและหลงใหลในเทคโนโลยีคอมพิวเตอร์และการเขียนโปรแกรมมาตั้งแต่ระดับมัธยมศึกษาตอนต้น ตลอดระยะเวลาที่ผ่านมา กระผมได้ศึกษาหาความรู้เพิ่มเติมด้วยตนเอง ควบคู่กับการทำกิจกรรมและประกวดโครงงานนวัตกรรม การได้เข้าศึกษาในสาขาวิชานี้จะช่วยส่งเสริมศักยภาพของกระผม เพื่อสร้างนวัตกรรมที่มีประโยชน์ต่อประเทศในอนาคต</textarea>
+            </div>
+          </div>
+        </details>
 
-            activeQuizQuests.forEach(q => {
-                if (!q.completed) {
-                    const pX = (q.pos.x - playerGroup.position.x) * scale;
-                    const pZ = (q.pos.z - playerGroup.position.z) * scale;
-                    ctx.fillStyle = '#f1c40f'; ctx.beginPath(); ctx.arc(cx + pX, cy + pZ, 4, 0, Math.PI * 2); ctx.fill();
-                }
-            });
-        }
+        <!-- Section 3: ทักษะความสามารถ (Skills) -->
+        <details class="group border border-slate-200 rounded-xl bg-slate-50/50">
+          <summary class="flex justify-between items-center p-3 font-semibold text-slate-700 cursor-pointer select-none group-open:text-blue-600 text-xs sm:text-sm">
+            <span class="flex items-center gap-2">
+              <i class="fa-solid fa-code text-blue-500 w-4"></i> 3. ทักษะ (Skills)
+            </span>
+            <i class="fa-solid fa-chevron-down text-xs transition-transform group-open:rotate-180"></i>
+          </summary>
+          <div class="p-4 bg-white border-t border-slate-200 rounded-b-xl space-y-3 text-xs">
+            <div>
+              <label class="block font-medium mb-1 text-slate-600">Hard Skills (คั่นด้วย ,)</label>
+              <input type="text" id="input-hardskills" value="Python, HTML/CSS, JavaScript, Data Analysis, Graphic Design" oninput="updateSkills('hardskills', this.value)" class="w-full p-2 border rounded-lg">
+            </div>
+            <div>
+              <label class="block font-medium mb-1 text-slate-600">Soft Skills (คั่นด้วย ,)</label>
+              <input type="text" id="input-softskills" value="Leadership, Problem Solving, Teamwork, Time Management" oninput="updateSkills('softskills', this.value)" class="w-full p-2 border rounded-lg">
+            </div>
+          </div>
+        </details>
 
-        // Main Game Loop
-        const clock = new THREE.Clock();
-        let animTimer = 0;
+        <!-- Section 4: กิจกรรม (Activities) -->
+        <details class="group border border-slate-200 rounded-xl bg-slate-50/50">
+          <summary class="flex justify-between items-center p-3 font-semibold text-slate-700 cursor-pointer select-none group-open:text-blue-600 text-xs sm:text-sm">
+            <span class="flex items-center gap-2">
+              <i class="fa-solid fa-person-running text-blue-500 w-4"></i> 4. กิจกรรมโดดเด่น
+            </span>
+            <i class="fa-solid fa-chevron-down text-xs transition-transform group-open:rotate-180"></i>
+          </summary>
+          <div class="p-4 bg-white border-t border-slate-200 rounded-b-xl space-y-4">
+            <div id="activities-form-container" class="space-y-4"></div>
+            <button onclick="addActivityItem()" class="w-full py-2 bg-blue-50 border border-dashed border-blue-300 text-blue-600 rounded-lg text-xs font-semibold hover:bg-blue-100 transition flex items-center justify-center gap-1">
+              <i class="fa-solid fa-plus"></i> เพิ่มกิจกรรม
+            </button>
+          </div>
+        </details>
 
-        function animate() {
-            requestAnimationFrame(animate);
-            const delta = clock.getDelta();
+        <!-- Section 5: เกียรติบัตร (Certificates) -->
+        <details class="group border border-slate-200 rounded-xl bg-slate-50/50">
+          <summary class="flex justify-between items-center p-3 font-semibold text-slate-700 cursor-pointer select-none group-open:text-blue-600 text-xs sm:text-sm">
+            <span class="flex items-center gap-2">
+              <i class="fa-solid fa-award text-blue-500 w-4"></i> 5. เกียรติบัตร & รางวัล
+            </span>
+            <i class="fa-solid fa-chevron-down text-xs transition-transform group-open:rotate-180"></i>
+          </summary>
+          <div class="p-4 bg-white border-t border-slate-200 rounded-b-xl space-y-4">
+            <div id="certs-form-container" class="space-y-4"></div>
+            <button onclick="addCertItem()" class="w-full py-2 bg-blue-50 border border-dashed border-blue-300 text-blue-600 rounded-lg text-xs font-semibold hover:bg-blue-100 transition flex items-center justify-center gap-1">
+              <i class="fa-solid fa-plus"></i> เพิ่มเกียรติบัตร
+            </button>
+          </div>
+        </details>
 
-            const speed = 9.5 * playerState.speedModifier * delta;
-            let moveX = 0, moveZ = 0;
+      </div>
 
-            if (keys.w) moveZ -= 1;
-            if (keys.s) moveZ += 1;
-            if (keys.a) moveX -= 1;
-            if (keys.d) moveX += 1;
+    </aside>
 
-            if (moveX !== 0 || moveZ !== 0) {
-                const moveDir = new THREE.Vector3(moveX, 0, moveZ).normalize();
-                moveDir.applyAxisAngle(new THREE.Vector3(0, 1, 0), camAngleX);
+    <!-- PREVIEW AREA (RIGHT / MAIN DISPLAY) -->
+    <main id="preview-container" class="lg:col-span-7 flex flex-col items-center">
+      
+      <div id="portfolio-document" class="print-area w-full max-w-[210mm] space-y-8">
 
-                const nextX = playerGroup.position.x + moveDir.x * speed;
-                const nextZ = playerGroup.position.z + moveDir.z * speed;
+        <!-- ================= PAGE 1: COVER PAGE ================= -->
+        <section class="a4-page shadow-xl rounded-2xl overflow-hidden flex flex-col justify-between border border-slate-200/80 relative theme-bg-gradient text-white p-8 sm:p-12">
+          
+          <div class="absolute top-0 right-0 w-96 h-96 bg-white/5 rounded-full blur-3xl pointer-events-none"></div>
+          <div class="absolute bottom-0 left-0 w-80 h-80 bg-amber-500/10 rounded-full blur-3xl pointer-events-none"></div>
 
-                let collided = false;
-                for (let obs of obstacles) {
-                    if (Math.hypot(nextX - obs.x, nextZ - obs.z) < obs.radius + 0.6) {
-                        collided = true; break;
-                    }
-                }
+          <!-- Cover Header Brand -->
+          <div class="relative z-10 flex justify-between items-start border-b border-white/10 pb-6">
+            <div>
+              <span class="inline-block px-3 py-1 bg-amber-400 text-slate-950 font-bold text-xs tracking-wider rounded-md uppercase mb-2">
+                NMPFOLIO TCAS
+              </span>
+              <h1 class="text-3xl sm:text-4xl font-extrabold tracking-tight text-white">
+                แฟ้มสะสมผลงาน
+              </h1>
+            </div>
+            <div class="text-right">
+              <div class="text-2xl font-black text-amber-400" data-bind="gpax">3.85</div>
+              <div class="text-[10px] text-slate-300 uppercase tracking-widest">GPAX สะสม 6 เทอม</div>
+            </div>
+          </div>
 
-                if (!collided) {
-                    playerGroup.position.x = nextX;
-                    playerGroup.position.z = nextZ;
-                }
+          <!-- Profile Badge -->
+          <div class="relative z-10 my-8 flex flex-col sm:flex-row items-center gap-8 bg-black/20 p-6 rounded-2xl border border-white/10 backdrop-blur-sm">
+            <div class="relative">
+              <div class="w-36 h-36 sm:w-44 sm:h-44 rounded-2xl overflow-hidden border-4 border-amber-400 shadow-2xl bg-slate-800 flex-shrink-0">
+                <img id="view-profile-img" src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=400" alt="Profile" class="w-full h-full object-cover">
+              </div>
+              <span class="absolute -bottom-2 -right-2 bg-amber-400 text-slate-950 text-xs px-2.5 py-1 rounded-full font-bold shadow">
+                TCAS68
+              </span>
+            </div>
 
-                playerGroup.rotation.y = Math.atan2(moveDir.x, moveDir.z);
-                animTimer += delta * 14;
-                leftLeg.rotation.x = Math.sin(animTimer) * 0.6; rightLeg.rotation.x = -Math.sin(animTimer) * 0.6;
-            } else {
-                leftLeg.rotation.x = 0; rightLeg.rotation.x = 0;
-            }
+            <div class="text-center sm:text-left space-y-2 flex-1">
+              <div class="inline-block px-2.5 py-0.5 bg-white/10 text-amber-300 text-xs rounded border border-white/20 font-medium">
+                ชื่อเล่น: <span data-bind="nickname">นนท์</span>
+              </div>
+              <h2 class="text-2xl sm:text-3xl font-bold text-white tracking-wide" data-bind="fullname">
+                นาย พัฒนศักดิ์ เรียนดี
+              </h2>
+              <p class="text-sm text-slate-300 font-light" data-bind="fullname-en">
+                Pattanasak Riandee
+              </p>
+              
+              <div class="pt-2 text-xs text-slate-300 space-y-1">
+                <p><i class="fa-solid fa-school text-amber-400 w-4"></i> <span data-bind="school">โรงเรียนวิทยาศาสตร์นำไทย</span></p>
+                <p><i class="fa-solid fa-book-open text-amber-400 w-4"></i> แผนการเรียน: <span data-bind="plan">วิทยาศาสตร์ - คณิตศาสตร์</span></p>
+              </div>
+            </div>
+          </div>
 
-            // Trap Collision
-            let insideTrap = false;
-            for (let trap of traps) {
-                if (Math.hypot(playerGroup.position.x - trap.x, playerGroup.position.z - trap.z) < trap.radius) {
-                    insideTrap = true; break;
-                }
-            }
-            if (insideTrap) {
-                playerState.speedModifier = 0.45;
-                document.getElementById('status-box').classList.remove('hidden');
-            } else {
-                playerState.speedModifier = 1.0;
-                document.getElementById('status-box').classList.add('hidden');
-            }
+          <!-- Target Box -->
+          <div class="relative z-10 bg-gradient-to-r from-amber-400 to-amber-500 text-slate-950 p-5 rounded-xl shadow-lg font-medium flex items-center gap-4">
+            <div class="w-12 h-12 bg-slate-950/10 rounded-lg flex items-center justify-center flex-shrink-0 text-2xl">
+              <i class="fa-solid fa-bullseye"></i>
+            </div>
+            <div>
+              <div class="text-xs uppercase font-bold tracking-wider opacity-80">เป้าหมายการศึกษา (Target)</div>
+              <div class="text-base sm:text-lg font-bold" data-bind="faculty">คณะวิศวกรรมศาสตร์ สาขาคอมพิวเตอร์</div>
+              <div class="text-xs sm:text-sm font-semibold opacity-90" data-bind="university">จุฬาลงกรณ์มหาวิทยาลัย</div>
+            </div>
+          </div>
 
-            checkCheckpointCollision();
+          <!-- Cover Footer -->
+          <div class="relative z-10 pt-6 border-t border-white/10 flex justify-between items-center text-xs text-slate-400">
+            <span>Nmpfolio Standard Portfolio</span>
+            <span>หน้า 1</span>
+          </div>
 
-            // BOSS AI
-            const distToBoss = playerGroup.position.distanceTo(bossGroup.position);
-            bossGroup.lookAt(playerGroup.position.x, bossGroup.position.y, playerGroup.position.z);
+        </section>
 
-            if (distToBoss > 4.8) {
-                const bossDir = new THREE.Vector3().subVectors(playerGroup.position, bossGroup.position).normalize();
-                const nextBossX = bossGroup.position.x + bossDir.x * bossState.speed * delta;
-                const nextBossZ = bossGroup.position.z + bossDir.z * bossState.speed * delta;
+        <!-- PAGE BREAK -->
+        <div class="page-break"></div>
 
-                obstacles = obstacles.filter(obs => {
-                    if (Math.hypot(nextBossX - obs.x, nextBossZ - obs.z) < obs.radius + 2.0) {
-                        scene.remove(obs.mesh);
-                        return false;
-                    }
-                    return true;
-                });
+        <!-- ================= PAGE 2: STATEMENT OF PURPOSE & PROFILE ================= -->
+        <section class="a4-page shadow-xl rounded-2xl border border-slate-200/80 p-8 sm:p-10 flex flex-col justify-between">
+          <div>
+            <div class="flex justify-between items-center border-b-2 theme-border-primary pb-3 mb-6">
+              <h2 class="text-xl font-bold text-slate-800 uppercase tracking-wide flex items-center gap-2">
+                <span class="theme-bg-primary text-white w-7 h-7 rounded-lg text-sm flex items-center justify-center font-bold">2</span>
+                แรงบันดาลใจ & ประวัติส่วนตัว
+              </h2>
+              <span class="text-xs text-slate-400">Nmpfolio</span>
+            </div>
 
-                bossGroup.position.x = nextBossX;
-                bossGroup.position.z = nextBossZ;
-            } else {
-                bossState.attackTimer += delta;
-                if (bossState.attackTimer >= 1.2) {
-                    bossState.attackTimer = 0;
-                    playerState.hp = Math.max(0, playerState.hp - bossState.atk);
-                    document.getElementById('ui-hp').style.width = `${(playerState.hp / playerState.maxHp) * 100}%`;
-                    if (playerState.hp <= 0) { alert(`💀 คุณถูก Titan Boss สังหาร!`); location.reload(); }
-                }
-            }
+            <!-- SOP Section -->
+            <div class="bg-slate-50 rounded-xl p-5 border border-slate-200 mb-6">
+              <h3 class="text-sm font-bold theme-text-primary uppercase tracking-wider mb-2 flex items-center gap-2">
+                <i class="fa-solid fa-heart-pulse"></i> แรงบันดาลใจในการเข้าศึกษา (Statement of Purpose)
+              </h3>
+              <p class="text-xs sm:text-sm text-slate-700 leading-relaxed italic whitespace-pre-line" data-bind="sop">
+                กระผมมีความสนใจและหลงใหลในเทคโนโลยีคอมพิวเตอร์...
+              </p>
+            </div>
 
-            // Boss Skill AoE Slam
-            bossState.skillTimer += delta;
-            if (bossState.skillTimer >= 4.5) {
-                bossState.skillTimer = 0;
-                aoeRing.position.set(bossGroup.position.x, 0.2, bossGroup.position.z);
-                aoeRing.scale.set(1, 1, 1);
-                aoeRing.material.opacity = 0.9;
+            <!-- Profile Details Grid -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+              <div class="space-y-3">
+                <h3 class="text-sm font-bold text-slate-800 uppercase tracking-wider border-b pb-1 flex items-center gap-2">
+                  <i class="fa-solid fa-user theme-text-primary"></i> ข้อมูลทั่วไป
+                </h3>
+                <ul class="text-xs space-y-2 text-slate-600">
+                  <li class="flex justify-between"><span class="font-medium text-slate-500">ชื่อ-นามสกุล:</span> <span class="font-semibold text-slate-800" data-bind="fullname">นาย พัฒนศักดิ์ เรียนดี</span></li>
+                  <li class="flex justify-between"><span class="font-medium text-slate-500">โรงเรียน:</span> <span class="font-semibold text-slate-800" data-bind="school">โรงเรียนวิทยาศาสตร์นำไทย</span></li>
+                  <li class="flex justify-between"><span class="font-medium text-slate-500">แผนการเรียน:</span> <span class="font-semibold text-slate-800" data-bind="plan">วิทยาศาสตร์ - คณิตศาสตร์</span></li>
+                  <li class="flex justify-between"><span class="font-medium text-slate-500">GPAX สะสม:</span> <span class="font-bold theme-text-primary" data-bind="gpax">3.85</span></li>
+                </ul>
+              </div>
 
-                if (distToBoss < 13.0) {
-                    playerState.hp = Math.max(0, playerState.hp - bossState.atk * 1.8);
-                    document.getElementById('ui-hp').style.width = `${(playerState.hp / playerState.maxHp) * 100}%`;
-                    if (playerState.hp <= 0) { alert(`💀 คุณโดนคลื่นพลังทุบพื้นของบอสสังหาร!`); location.reload(); }
-                }
-            }
+              <div class="space-y-3">
+                <h3 class="text-sm font-bold text-slate-800 uppercase tracking-wider border-b pb-1 flex items-center gap-2">
+                  <i class="fa-solid fa-address-book theme-text-primary"></i> ช่องทางติดต่อ
+                </h3>
+                <ul class="text-xs space-y-2 text-slate-600">
+                  <li class="flex items-center gap-2"><i class="fa-solid fa-phone theme-text-primary w-4"></i> <span data-bind="phone">081-234-5678</span></li>
+                  <li class="flex items-center gap-2"><i class="fa-solid fa-envelope theme-text-primary w-4"></i> <span data-bind="email">pattanasak@email.com</span></li>
+                  <li class="flex items-center gap-2"><i class="fa-brands fa-line text-emerald-500 w-4"></i> <span data-bind="line">@pattanasak_dev</span></li>
+                  <li class="flex items-center gap-2"><i class="fa-solid fa-globe theme-text-primary w-4"></i> <span data-bind="social">Pattanasak Dev</span></li>
+                </ul>
+              </div>
+            </div>
 
-            if (aoeRing.material.opacity > 0) {
-                aoeRing.scale.addScalar(delta * 8);
-                aoeRing.material.opacity -= delta * 1.5;
-            }
+            <!-- Skills -->
+            <div class="space-y-3">
+              <h3 class="text-sm font-bold text-slate-800 uppercase tracking-wider border-b pb-1 flex items-center gap-2">
+                <i class="fa-solid fa-laptop-code theme-text-primary"></i> ทักษะความสามารถ (SKILLS)
+              </h3>
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div class="bg-slate-50 p-3 rounded-xl border border-slate-200">
+                  <span class="text-xs font-bold text-slate-700 block mb-2">Hard Skills</span>
+                  <div id="view-hardskills" class="flex flex-wrap gap-1"></div>
+                </div>
+                <div class="bg-slate-50 p-3 rounded-xl border border-slate-200">
+                  <span class="text-xs font-bold text-slate-700 block mb-2">Soft Skills</span>
+                  <div id="view-softskills" class="flex flex-wrap gap-1"></div>
+                </div>
+              </div>
+            </div>
 
-            // Camera Tracking
-            const camDist = 12;
-            camera.position.x = playerGroup.position.x + camDist * Math.sin(camAngleX) * Math.cos(camAngleY);
-            camera.position.y = playerGroup.position.y + camDist * Math.sin(camAngleY);
-            camera.position.z = playerGroup.position.z + camDist * Math.cos(camAngleX) * Math.cos(camAngleY);
-            camera.lookAt(playerGroup.position.x, playerGroup.position.y + 1.2, playerGroup.position.z);
+          </div>
 
-            drawMinimap();
-            renderer.render(scene, camera);
-        }
+          <div class="pt-6 text-right text-xs text-slate-400 border-t border-slate-100">
+            หน้า 2
+          </div>
+        </section>
 
-        window.addEventListener('resize', () => {
-            camera.aspect = window.innerWidth / window.innerHeight;
-            camera.updateProjectionMatrix();
-            renderer.setSize(window.innerWidth, window.innerHeight);
-        });
+        <!-- PAGE BREAK -->
+        <div class="page-break"></div>
 
-        generateRandom3QuizQuests();
-        animate();
-    </script>
-</body>
-</html>
+        <!-- ================= PAGE 3: ACTIVITIES ================= -->
+        <section class="a4-page shadow-xl rounded-2xl border border-slate-200/80 p-8 sm:p-10 flex flex-col justify-between">
+          <div>
+            <div class="flex justify-between items-center border-b-2 theme-border-primary pb-3 mb-6">
+              <h2 class="text-xl font-bold text-slate-800 uppercase tracking-wide flex items-center gap-2">
+                <span class="theme-bg-primary text-white w-7 h-7 rounded-lg text-sm flex items-center justify-center font-bold">3</span>
+                กิจกรรมและความคิดสร้างสรรค์ (ACTIVITIES)
+              </h2>
+              <span class="text-xs text-slate-400">Nmpfolio</span>
+            </div>
+
+            <div id="view-activities-list" class="grid grid-cols-1 md:grid-cols-2 gap-4"></div>
+          </div>
+
+          <div class="pt-6 text-right text-xs text-slate-400 border-t border-slate-100">
+            หน้า 3
+          </div>
+        </section>
+
+        <!-- PAGE BREAK -->
+        <div class="page-break"></div>
+
+        <!-- ================= PAGE 4: CERTIFICATES ================= -->
+        <section class="a4-page shadow-xl rounded-2xl border border-slate-200/80 p-8 sm:p-10 flex flex-col justify-between">
+          <div>
+            <div class="flex justify-between items-center border-b-2 theme-border-primary pb-3 mb-6">
+              <h2 class="text-xl font-bold text-slate-800 uppercase tracking-wide flex items-center gap-2">
+                <span class="theme-bg-primary text-white w-7 h-7 rounded-lg text-sm flex items-center justify-center font-bold">4</span>
+                เกียรติบัตรและรางวัล (CERTIFICATES)
+              </h2>
+              <span class="text-xs text-slate-400">Nmpfolio</span>
+            </div>
+
+            <div id="view-certs-list" class="grid grid-cols-1 md:grid-cols-2 gap-4"></div>
+          </div>
+
+          <div class="pt-6 text-right text-xs text-slate-400 border-t border-slate-100">
+            หน้า 4
+          </div>
+        </section>
+
+      </div>
+
+    </main>
+
+  </div>
+
+  <script>
+    function setTheme(themeClass) {
+      document.body.className = `bg-slate-100 font-sans text-slate-800 antialiased min-h-screen flex flex-col ${themeClass}`;
+    }
+
+    function saveToLocalStorage() {
+      localStorage.setItem('nmpfolio_data', JSON.stringify(portfolioData));
+      alert('บันทึกข้อมูลลงในเครื่องสำเร็จ!');
+    }
+  </script>
+<!-- ... existing code -->
