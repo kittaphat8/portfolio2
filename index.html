@@ -1,0 +1,605 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fantasy 3D - Fixed Dash Direction</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Kanit:wght@400;600;800&display=swap');
+
+        * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; }
+        body { background-color: #000; color: #fff; font-family: 'Kanit', sans-serif; overflow: hidden; width: 100vw; height: 100vh; }
+        #canvas-container { width: 100%; height: 100%; position: absolute; top: 0; left: 0; z-index: 1; }
+        
+        .hud-layer {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            z-index: 10; pointer-events: none; display: flex; flex-direction: column;
+            justify-content: space-between; padding: 15px;
+        }
+        .interactive { pointer-events: auto; }
+
+        .player-info-box {
+            display: flex; align-items: center; gap: 12px;
+            background: rgba(0, 0, 0, 0.6); border: 1px solid rgba(255, 255, 255, 0.2);
+            padding: 8px 15px; border-radius: 8px; width: fit-content;
+        }
+        .level-badge {
+            background: #e67e22; color: #fff; font-weight: 800; border-radius: 50%;
+            width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; font-size: 1.1rem;
+        }
+        .bars-container { display: flex; flex-direction: column; gap: 4px; width: 160px; }
+        .bar-bg { height: 10px; background: rgba(0, 0, 0, 0.6); border-radius: 5px; overflow: hidden; border: 1px solid rgba(255, 255, 255, 0.1); }
+        .hp-fill { width: 100%; height: 100%; background: linear-gradient(90deg, #e74c3c, #2ecc71); transition: width 0.15s; }
+        .exp-fill { width: 0%; height: 100%; background: #3498db; transition: width 0.15s; }
+
+        .quest-tracker {
+            position: absolute; top: 15px; right: 15px;
+            background: rgba(0, 0, 0, 0.75); border-left: 4px solid #f1c40f;
+            padding: 12px 15px; border-radius: 6px; font-size: 0.85rem; min-width: 280px;
+        }
+        .quest-header { color: #f1c40f; font-weight: 800; margin-bottom: 8px; border-bottom: 1px solid rgba(241, 196, 15, 0.3); padding-bottom: 4px; }
+        .quest-item { margin-bottom: 6px; font-size: 0.8rem; color: #ddd; padding: 4px 6px; border-radius: 4px; background: rgba(255, 255, 255, 0.05); }
+        .quest-item.completed { color: #2ecc71; text-decoration: line-through; background: transparent; }
+
+        .boss-hp-box {
+            position: absolute; top: 15px; left: 50%; transform: translateX(-50%);
+            width: 380px; background: rgba(0, 0, 0, 0.75); border: 2px solid #e74c3c;
+            padding: 8px 15px; border-radius: 6px; text-align: center; box-shadow: 0 0 20px rgba(231, 76, 60, 0.8);
+        }
+        .boss-name { font-size: 0.95rem; font-weight: 800; color: #ff4757; margin-bottom: 4px; text-transform: uppercase; }
+        .boss-hp-fill { width: 100%; height: 12px; background: #ff4757; border-radius: 3px; transition: width 0.1s; }
+
+        .minimap-container {
+            position: absolute; bottom: 20px; left: 20px; width: 130px; height: 130px;
+            border-radius: 50%; border: 3px solid rgba(255, 255, 255, 0.5);
+            background: rgba(20, 30, 20, 0.6); overflow: hidden;
+        }
+        #minimap-canvas { width: 100%; height: 100%; }
+
+        .skill-bar { position: absolute; bottom: 20px; right: 20px; display: flex; gap: 10px; }
+        .skill-btn {
+            width: 55px; height: 55px; border-radius: 50%; background: rgba(0, 0, 0, 0.6);
+            border: 2px solid rgba(255, 255, 255, 0.4); display: flex; flex-direction: column;
+            align-items: center; justify-content: center; font-size: 1.2rem; cursor: pointer;
+        }
+        .skill-btn.active { border-color: #f1c40f; box-shadow: 0 0 12px #f1c40f; }
+        .skill-key { font-size: 0.65rem; color: #aaa; margin-top: -2px; }
+
+        .modal-overlay {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0, 0, 0, 0.75); z-index: 100; display: flex; align-items: center; justify-content: center;
+        }
+        .quiz-card { background: #1e272e; border: 2px solid #f1c40f; border-radius: 12px; padding: 24px; width: 90%; max-width: 500px; }
+        .quiz-title { color: #f1c40f; font-size: 1.1rem; font-weight: 800; margin-bottom: 12px; }
+        .quiz-question { font-size: 0.95rem; margin-bottom: 16px; line-height: 1.4; color: #fff; }
+        .quiz-options { display: flex; flex-direction: column; gap: 10px; }
+        .quiz-opt-btn {
+            background: rgba(255, 255, 255, 0.08); border: 1px solid rgba(255, 255, 255, 0.2);
+            padding: 10px 14px; border-radius: 6px; color: #fff; text-align: left;
+            font-family: 'Kanit', sans-serif; font-size: 0.85rem; cursor: pointer;
+        }
+        .quiz-opt-btn:hover { background: rgba(241, 196, 15, 0.2); border-color: #f1c40f; }
+        .hidden { display: none !important; }
+
+        .status-effect {
+            position: absolute; top: 70px; left: 20px; background: rgba(231, 76, 60, 0.8);
+            padding: 4px 10px; border-radius: 4px; font-size: 0.8rem; font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="canvas-container"></div>
+
+    <div class="hud-layer">
+        <div class="player-info-box interactive">
+            <div class="level-badge" id="ui-level">1</div>
+            <div class="bars-container">
+                <div class="bar-bg"><div id="ui-hp" class="hp-fill"></div></div>
+                <div class="bar-bg"><div id="ui-exp" class="exp-fill"></div></div>
+            </div>
+        </div>
+
+        <div id="status-box" class="status-effect hidden">❄️ ติดสถานะสโลว์ (Slowed)</div>
+
+        <div class="quest-tracker">
+            <div class="quest-header">📍 ภารกิจเดินไปที่เสาเควส (3 จุด)</div>
+            <div id="quest-list-container"></div>
+        </div>
+
+        <div id="boss-hud" class="boss-hp-box">
+            <div class="boss-name" id="boss-title">🛡️ TITAN GOLEM [Lv. 1] 🛡️</div>
+            <div class="bar-bg"><div id="ui-boss-hp" class="boss-hp-fill"></div></div>
+        </div>
+
+        <div class="minimap-container">
+            <canvas id="minimap-canvas" width="130" height="130"></canvas>
+        </div>
+
+        <div class="skill-bar interactive">
+            <div class="skill-btn active" onclick="playerAttack()">⚔️<span class="skill-key">คลิกซ้าย</span></div>
+            <div class="skill-btn" onclick="useHeavyAttack()">💥<span class="skill-key">[ E ]</span></div>
+            <div class="skill-btn" onclick="dash()">💨<span class="skill-key">[ Shift ]</span></div>
+        </div>
+    </div>
+
+    <div id="quiz-modal" class="modal-overlay hidden">
+        <div class="quiz-card">
+            <div class="quiz-title" id="quiz-modal-title">เสาเควสทดสอบความรู้</div>
+            <div class="quiz-question" id="quiz-modal-q">คำถาม...</div>
+            <div class="quiz-options" id="quiz-modal-options"></div>
+        </div>
+    </div>
+
+    <script src="https://unpkg.com/three@0.128.0/build/three.min.js"></script>
+
+    <script>
+        const playerState = { hp: 300, maxHp: 300, exp: 0, maxExp: 100, level: 1, atk: 50, isAttacking: false, dashCooldown: false, speedModifier: 1 };
+        const bossState = { level: 1, hp: 1800, maxHp: 1800, atk: 45, speed: 3.5, attackTimer: 0, skillTimer: 0 };
+
+        const quizQuestPool = [
+            { id: 1, topic: "ความรู้ดิจิทัล", q: "หากได้รับ SMS แจ้งว่า บัญชีธนาคารถูกล็อก พร้อมแนบลิงก์ให้กด ควรทำอย่างไร?", opts: ["กดลิงก์ทันที", "ลบข้อความ หรือโทรสอบถามศูนย์บริการหลัก", "ส่งต่อให้เพื่อน"], ans: 1 },
+            { id: 2, topic: "การป้องกันตนเอง", q: "การตั้งรหัสผ่าน (Password) ข้อใดรัดกุมและปลอดภัยที่สุด?", opts: ["12345678", "วันเดือนปีเกิด", "ผสมอักษรใหญ่ เล็ก ตัวเลข และสัญลักษณ์"], ans: 2 },
+            { id: 3, topic: "การเคารพผู้อื่น", q: "เห็นรูปหลุดตลกๆ ของเพื่อนในกลุ่มปิด ควรทำอย่างไร?", opts: ["แคปหน้าจอไปโพสต์ประจาน", "ไม่แชร์ต่อ และตักเตือนเพื่อนที่ส่งรูปมา", "กดแชร์สาธารณะ"], ans: 1 },
+            { id: 4, topic: "ความเป็นส่วนตัว", q: "ข้อใด ไม่ควร โพสต์ลงบนสื่อสังคมออนไลน์สาธารณะ?", opts: ["บัตรประชาชน หรือบัตรนักเรียน", "รูปวิวทิวทัศน์", "รีวิวอาหาร"], ans: 0 },
+            { id: 5, topic: "ความรู้ดิจิทัล", q: "Phishing หมายถึงภัยคุกคามไซเบอร์รูปแบบใด?", opts: ["ส่งไวรัสผ่านแฟลชไดรฟ์", "สร้างเว็บ/อีเมลหลอกลวงเพื่อขโมยข้อมูล", "แฮกบลูทูธ"], ans: 1 },
+            { id: 6, topic: "การเคารพผู้อื่น", q: "หากพบเห็นการ Cyberbullying ควรปฏิบัติตนอย่างไร?", opts: ["ร่วมด่าทอด้วย", "กด Report บัญชีผู้ระราน และไม่ส่งต่อ", "ช่วยแชร์กระจายข่าว"], ans: 1 },
+            { id: 7, topic: "การป้องกันตนเอง", q: "การเปิดใช้งาน 2FA มีประโยชน์อย่างไร?", opts: ["ทำให้เน็ตเร็วขึ้น", "เพิ่มความปลอดภัยอีกชั้นแม้ถูกรู้รหัสผ่าน", "ประหยัดแบตเตอรี่"], ans: 1 },
+            { id: 8, topic: "ความรู้ดิจิทัล", q: "Digital Footprint หมายถึงสิ่งใด?", opts: ["ประวัติการใช้งานและกิจกรรมออนไลน์ของเรา", "แอปนับก้าวเดิน", "อุปกรณ์แท็บเล็ต"], ans: 0 },
+            { id: 9, topic: "การเคารพตนเอง", q: "โดนคนแปลกหน้าคอมเมนต์ด่าทอด้วยคำรุนแรง ควรทำอย่างไร?", opts: ["ด่ากลับแรงกว่า", "บล็อก รายงานระบบ และไม่ให้ค่า", "โพสต์เรียกร้องความสนใจ"], ans: 1 },
+            { id: 10, topic: "ความเป็นส่วนตัว", q: "ใช้ Wi-Fi สาธารณะ ข้อใดปลอดภัยที่สุด?", opts: ["โอนเงินทำธุรกรรม", "เลี่ยงเข้าเว็บสำคัญหรือเปิด VPN", "โหลดไฟล์แปลกๆ"], ans: 1 }
+        ];
+
+        let activeQuizQuests = [];
+        let activeCheckpointIndex = -1;
+        let obstacles = [];
+        const traps = [];
+
+        // Scene Setup
+        const container = document.getElementById('canvas-container');
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x1a252f);
+        scene.fog = new THREE.FogExp2(0x1a252f, 0.007);
+
+        const camera = new THREE.PerspectiveCamera(55, window.innerWidth / window.innerHeight, 0.1, 1000);
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.shadowMap.enabled = true;
+        container.appendChild(renderer.domElement);
+
+        scene.add(new THREE.AmbientLight(0xffffff, 0.4));
+        const dirLight = new THREE.DirectionalLight(0xfffaed, 0.8);
+        dirLight.position.set(80, 120, 60);
+        scene.add(dirLight);
+
+        // Ground
+        const ground = new THREE.Mesh(
+            new THREE.PlaneGeometry(320, 320),
+            new THREE.MeshStandardMaterial({ color: 0x1e272e, roughness: 0.9 })
+        );
+        ground.rotation.x = -Math.PI / 2;
+        scene.add(ground);
+
+        // Build Obstacles & Traps
+        function generateObstaclesAndTraps() {
+            const rockMat = new THREE.MeshStandardMaterial({ color: 0x485460 });
+            const trunkMat = new THREE.MeshStandardMaterial({ color: 0x3d1e6d });
+            const leavesMat = new THREE.MeshStandardMaterial({ color: 0x05c46b });
+            const trapMat = new THREE.MeshBasicMaterial({ color: 0xff3f34, wireframe: true });
+
+            for (let i = 0; i < 90; i++) {
+                const x = (Math.random() - 0.5) * 230;
+                const z = (Math.random() - 0.5) * 230;
+                if (Math.hypot(x, z) < 15 || Math.hypot(x, z + 50) < 15) continue;
+
+                if (Math.random() > 0.4) {
+                    const tree = new THREE.Group();
+                    const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.7, 1, 4.5), trunkMat); trunk.position.y = 2.25; tree.add(trunk);
+                    const leaves = new THREE.Mesh(new THREE.ConeGeometry(3.2, 7, 6), leavesMat); leaves.position.y = 6; tree.add(leaves);
+                    tree.position.set(x, 0, z);
+                    scene.add(tree);
+                    obstacles.push({ x, z, radius: 2.0, mesh: tree });
+                } else {
+                    const size = 1.8 + Math.random() * 2.5;
+                    const rock = new THREE.Mesh(new THREE.DodecahedronGeometry(size, 1), rockMat);
+                    rock.position.set(x, size / 2, z);
+                    scene.add(rock);
+                    obstacles.push({ x, z, radius: size * 0.95, mesh: rock });
+                }
+            }
+
+            for (let i = 0; i < 20; i++) {
+                const x = (Math.random() - 0.5) * 210;
+                const z = (Math.random() - 0.5) * 210;
+                if (Math.hypot(x, z) < 15) continue;
+
+                const trapMesh = new THREE.Mesh(new THREE.TorusGeometry(1.5, 0.2, 8, 16), trapMat);
+                trapMesh.rotation.x = Math.PI / 2;
+                trapMesh.position.set(x, 0.1, z);
+                scene.add(trapMesh);
+                traps.push({ x, z, radius: 1.5 });
+            }
+        }
+        generateObstaclesAndTraps();
+
+        // Player Model
+        const playerGroup = new THREE.Group();
+        const armorMat = new THREE.MeshStandardMaterial({ color: 0x00d2d3 });
+        const torso = new THREE.Mesh(new THREE.BoxGeometry(0.9, 1.2, 0.6), armorMat); torso.position.y = 1.2; playerGroup.add(torso);
+        const head = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.6, 0.6), armorMat); head.position.y = 2.1; playerGroup.add(head);
+        const leftArm = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.9, 0.3), armorMat); leftArm.position.set(-0.65, 1.2, 0); playerGroup.add(leftArm);
+        const rightArm = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.9, 0.3), armorMat); rightArm.position.set(0.65, 1.2, 0); playerGroup.add(rightArm);
+        const leftLeg = new THREE.Mesh(new THREE.BoxGeometry(0.35, 0.7, 0.35), armorMat); leftLeg.position.set(-0.25, 0.35, 0); playerGroup.add(leftLeg);
+        const rightLeg = new THREE.Mesh(new THREE.BoxGeometry(0.35, 0.7, 0.35), armorMat); rightLeg.position.set(0.25, 0.35, 0); playerGroup.add(rightLeg);
+        const sword = new THREE.Mesh(new THREE.BoxGeometry(0.12, 1.8, 0.3), new THREE.MeshStandardMaterial({ color: 0xffc048 }));
+        sword.position.set(0, -0.4, -0.4); sword.rotation.x = Math.PI / 3; rightArm.add(sword);
+        scene.add(playerGroup);
+
+        // Heavy Boss Model
+        const bossGroup = new THREE.Group();
+        const golemMat = new THREE.MeshStandardMaterial({ color: 0x8e44ad, roughness: 0.3, metalness: 0.5 });
+        const bossBody = new THREE.Mesh(new THREE.DodecahedronGeometry(4.0, 1), golemMat); bossBody.position.y = 5.0; bossGroup.add(bossBody);
+        const bossHead = new THREE.Mesh(new THREE.BoxGeometry(1.8, 1.8, 1.8), new THREE.MeshBasicMaterial({ color: 0xf1c40f })); bossHead.position.y = 8.2; bossGroup.add(bossHead);
+        bossGroup.position.set(0, 0, -50);
+        scene.add(bossGroup);
+
+        // Boss Skill Visual Ring
+        const aoeRing = new THREE.Mesh(
+            new THREE.RingGeometry(0.1, 14, 32),
+            new THREE.MeshBasicMaterial({ color: 0xe74c3c, side: THREE.DoubleSide, transparent: true, opacity: 0 })
+        );
+        aoeRing.rotation.x = Math.PI / 2;
+        aoeRing.position.y = 0.2;
+        scene.add(aoeRing);
+
+        // Checkpoint Monoliths
+        const checkpointGroup = new THREE.Group();
+        scene.add(checkpointGroup);
+
+        function generateRandom3QuizQuests() {
+            checkpointGroup.clear();
+            const shuffled = [...quizQuestPool].sort(() => 0.5 - Math.random());
+
+            activeQuizQuests = shuffled.slice(0, 3).map((q, idx) => {
+                const angle = (idx / 3) * Math.PI * 2 + Math.random();
+                const dist = 35 + Math.random() * 45;
+                const pos = new THREE.Vector3(Math.cos(angle) * dist, 0, Math.sin(angle) * dist);
+
+                const pillarGeo = new THREE.CylinderGeometry(0.8, 1, 6, 8);
+                const pillarMat = new THREE.MeshStandardMaterial({ color: 0xf1c40f, emissive: 0xf1c40f, emissiveIntensity: 0.8 });
+                const pillar = new THREE.Mesh(pillarGeo, pillarMat);
+                pillar.position.set(pos.x, 3, pos.z);
+
+                pillar.userData = { questIndex: idx };
+                checkpointGroup.add(pillar);
+
+                return { ...q, pos, completed: false, pillarMesh: pillar };
+            });
+
+            renderQuizQuestsUI();
+        }
+
+        function renderQuizQuestsUI() {
+            const container = document.getElementById('quest-list-container');
+            container.innerHTML = '';
+            activeQuizQuests.forEach((q, idx) => {
+                const div = document.createElement('div');
+                div.className = `quest-item ${q.completed ? 'completed' : ''}`;
+                div.innerHTML = `${idx + 1}. <b>[${q.topic}]</b> ${q.completed ? '✅ สำเร็จ' : '🏃 เดินไปที่เสาเควส'}`;
+                container.appendChild(div);
+            });
+        }
+
+        function checkCheckpointCollision() {
+            if (!document.getElementById('quiz-modal').classList.contains('hidden')) return;
+            activeQuizQuests.forEach((q, idx) => {
+                if (!q.completed && playerGroup.position.distanceTo(q.pos) < 3.2) {
+                    openQuizModal(idx);
+                }
+            });
+        }
+
+        function openQuizModal(index) {
+            activeCheckpointIndex = index;
+            const q = activeQuizQuests[index];
+            document.getElementById('quiz-modal-title').innerText = `📍 เสาเควสที่ ${index + 1}: ${q.topic}`;
+            document.getElementById('quiz-modal-q').innerText = q.q;
+
+            const optsBox = document.getElementById('quiz-modal-options');
+            optsBox.innerHTML = '';
+            q.opts.forEach((optText, oIdx) => {
+                const btn = document.createElement('button');
+                btn.className = 'quiz-opt-btn';
+                btn.innerText = `${oIdx + 1}. ${optText}`;
+                btn.onclick = () => answerQuiz(oIdx);
+                optsBox.appendChild(btn);
+            });
+
+            document.getElementById('quiz-modal').classList.remove('hidden');
+        }
+
+        function answerQuiz(selectedOpt) {
+            const q = activeQuizQuests[activeCheckpointIndex];
+            document.getElementById('quiz-modal').classList.add('hidden');
+
+            if (selectedOpt === q.ans) {
+                alert("✨ ถูกต้อง! เสาเควสปลดล็อก พลังโจมตีเพิ่มขึ้นอย่างมาก!");
+                q.completed = true;
+                q.pillarMesh.material.color.setHex(0x2ecc71);
+                q.pillarMesh.material.emissive.setHex(0x2ecc71);
+                playerState.atk += 35;
+                addExp(50);
+                renderQuizQuestsUI();
+            } else {
+                alert("❌ คำตอบผิด! ถอยออกไปแล้วลองเข้ามาใหม่");
+            }
+        }
+
+        // Key Controls
+        const keys = { w: false, a: false, s: false, d: false };
+        let mouseX = 0, mouseY = 0, isMouseDown = false;
+        let camAngleX = 0, camAngleY = 0.3;
+
+        window.addEventListener('keydown', (e) => {
+            const k = e.key.toLowerCase();
+            if (k in keys) keys[k] = true;
+            
+            if (e.key === 'Shift' || e.code.includes('Shift')) dash();
+            if (k === 'e') useHeavyAttack();
+            if (e.code === 'Space') playerAttack();
+        });
+        
+        window.addEventListener('keyup', (e) => {
+            const k = e.key.toLowerCase();
+            if (k in keys) keys[k] = false;
+        });
+
+        window.addEventListener('mousedown', (e) => {
+            if (e.button === 0) playerAttack();
+            if (e.button === 2) { isMouseDown = true; mouseX = e.clientX; mouseY = e.clientY; }
+        });
+        window.addEventListener('mouseup', () => isMouseDown = false);
+        window.addEventListener('contextmenu', e => e.preventDefault());
+        window.addEventListener('mousemove', (e) => {
+            if (isMouseDown) {
+                camAngleX -= (e.clientX - mouseX) * 0.005;
+                camAngleY = Math.max(0.1, Math.min(1.2, camAngleY + (e.clientY - mouseY) * 0.005));
+                mouseX = e.clientX; mouseY = e.clientY;
+            }
+        });
+
+        // Player Actions
+        function playerAttack() {
+            if (playerState.isAttacking) return;
+            playerState.isAttacking = true;
+            rightArm.rotation.x = -Math.PI / 2;
+
+            if (playerGroup.position.distanceTo(bossGroup.position) < 8.0) {
+                bossState.hp = Math.max(0, bossState.hp - (playerState.atk + Math.floor(Math.random() * 20)));
+                document.getElementById('ui-boss-hp').style.width = `${(bossState.hp / bossState.maxHp) * 100}%`;
+                if (bossState.hp <= 0) onBossDefeated();
+            }
+            setTimeout(() => { rightArm.rotation.x = 0; playerState.isAttacking = false; }, 180);
+        }
+
+        function useHeavyAttack() {
+            if (playerState.isAttacking) return;
+            playerState.isAttacking = true;
+            rightArm.rotation.x = -Math.PI;
+            setTimeout(() => {
+                if (playerGroup.position.distanceTo(bossGroup.position) < 8.5) {
+                    bossState.hp = Math.max(0, bossState.hp - playerState.atk * 2.5);
+                    document.getElementById('ui-boss-hp').style.width = `${(bossState.hp / bossState.maxHp) * 100}%`;
+                    if (bossState.hp <= 0) onBossDefeated();
+                }
+                rightArm.rotation.x = 0; playerState.isAttacking = false;
+            }, 250);
+        }
+
+        // ระบบการพุ่งที่แก้ไขทิศทางแล้ว
+        function dash() {
+            if (playerState.dashCooldown) return;
+            playerState.dashCooldown = true;
+            
+            let moveX = 0, moveZ = 0;
+            if (keys.w) moveZ -= 1;
+            if (keys.s) moveZ += 1;
+            if (keys.a) moveX -= 1;
+            if (keys.d) moveX += 1;
+
+            let dashDir = new THREE.Vector3(moveX, 0, moveZ);
+            
+            // ถ้าไม่ได้กดปุ่มเดิน ให้พุ่งไปตามหน้าตัวละคร
+            if (dashDir.length() === 0) {
+                dashDir.set(0, 0, -1).applyAxisAngle(new THREE.Vector3(0, 1, 0), playerGroup.rotation.y);
+            } else {
+                dashDir.normalize().applyAxisAngle(new THREE.Vector3(0, 1, 0), camAngleX);
+            }
+
+            playerGroup.position.addScaledVector(dashDir, 10);
+            setTimeout(() => playerState.dashCooldown = false, 350);
+        }
+
+        function onBossDefeated() {
+            addExp(250);
+            bossState.level++;
+            bossState.maxHp = Math.floor(bossState.maxHp * 1.6);
+            bossState.hp = bossState.maxHp;
+            bossState.atk = Math.floor(bossState.atk * 1.3);
+            bossState.speed += 0.4;
+            bossGroup.position.set(0, 0, -60);
+
+            document.getElementById('boss-title').innerText = `🛡️ TITAN GOLEM [Lv. ${bossState.level}] 🛡️`;
+            document.getElementById('ui-boss-hp').style.width = `100%`;
+
+            generateRandom3QuizQuests();
+            alert(`🎉 ปราบบอสสำเร็จ!\n🛡️ บอสวิวัฒนาการเป็น [Lv. ${bossState.level}]\n📍 เสาเควสได้รับการสุ่มตำแหน่งใหม่!`);
+        }
+
+        function addExp(amount) {
+            playerState.exp += amount;
+            if (playerState.exp >= playerState.maxExp) {
+                playerState.level++;
+                playerState.exp -= playerState.maxExp;
+                playerState.maxExp += 60;
+                playerState.maxHp += 50;
+                playerState.hp = playerState.maxHp;
+                playerState.atk += 20;
+                document.getElementById('ui-level').innerText = playerState.level;
+                document.getElementById('ui-hp').style.width = '100%';
+            }
+            document.getElementById('ui-exp').style.width = `${(playerState.exp / playerState.maxExp) * 100}%`;
+        }
+
+        // Minimap
+        const minimapCanvas = document.getElementById('minimap-canvas');
+        const ctx = minimapCanvas.getContext('2d');
+        function drawMinimap() {
+            ctx.clearRect(0, 0, 130, 130);
+            const cx = 65, cy = 65, scale = 0.75;
+
+            ctx.fillStyle = '#00d2d3'; ctx.beginPath(); ctx.arc(cx, cy, 4, 0, Math.PI * 2); ctx.fill();
+
+            const bX = (bossGroup.position.x - playerGroup.position.x) * scale;
+            const bZ = (bossGroup.position.z - playerGroup.position.z) * scale;
+            ctx.fillStyle = '#ff3f34'; ctx.beginPath(); ctx.arc(cx + bX, cy + bZ, 7, 0, Math.PI * 2); ctx.fill();
+
+            activeQuizQuests.forEach(q => {
+                if (!q.completed) {
+                    const pX = (q.pos.x - playerGroup.position.x) * scale;
+                    const pZ = (q.pos.z - playerGroup.position.z) * scale;
+                    ctx.fillStyle = '#f1c40f'; ctx.beginPath(); ctx.arc(cx + pX, cy + pZ, 4, 0, Math.PI * 2); ctx.fill();
+                }
+            });
+        }
+
+        // Main Game Loop
+        const clock = new THREE.Clock();
+        let animTimer = 0;
+
+        function animate() {
+            requestAnimationFrame(animate);
+            const delta = clock.getDelta();
+
+            const speed = 9.5 * playerState.speedModifier * delta;
+            let moveX = 0, moveZ = 0;
+
+            if (keys.w) moveZ -= 1;
+            if (keys.s) moveZ += 1;
+            if (keys.a) moveX -= 1;
+            if (keys.d) moveX += 1;
+
+            if (moveX !== 0 || moveZ !== 0) {
+                const moveDir = new THREE.Vector3(moveX, 0, moveZ).normalize();
+                moveDir.applyAxisAngle(new THREE.Vector3(0, 1, 0), camAngleX);
+
+                const nextX = playerGroup.position.x + moveDir.x * speed;
+                const nextZ = playerGroup.position.z + moveDir.z * speed;
+
+                let collided = false;
+                for (let obs of obstacles) {
+                    if (Math.hypot(nextX - obs.x, nextZ - obs.z) < obs.radius + 0.6) {
+                        collided = true; break;
+                    }
+                }
+
+                if (!collided) {
+                    playerGroup.position.x = nextX;
+                    playerGroup.position.z = nextZ;
+                }
+
+                playerGroup.rotation.y = Math.atan2(moveDir.x, moveDir.z);
+                animTimer += delta * 14;
+                leftLeg.rotation.x = Math.sin(animTimer) * 0.6; rightLeg.rotation.x = -Math.sin(animTimer) * 0.6;
+            } else {
+                leftLeg.rotation.x = 0; rightLeg.rotation.x = 0;
+            }
+
+            // Trap Collision
+            let insideTrap = false;
+            for (let trap of traps) {
+                if (Math.hypot(playerGroup.position.x - trap.x, playerGroup.position.z - trap.z) < trap.radius) {
+                    insideTrap = true; break;
+                }
+            }
+            if (insideTrap) {
+                playerState.speedModifier = 0.45;
+                document.getElementById('status-box').classList.remove('hidden');
+            } else {
+                playerState.speedModifier = 1.0;
+                document.getElementById('status-box').classList.add('hidden');
+            }
+
+            checkCheckpointCollision();
+
+            // BOSS AI
+            const distToBoss = playerGroup.position.distanceTo(bossGroup.position);
+            bossGroup.lookAt(playerGroup.position.x, bossGroup.position.y, playerGroup.position.z);
+
+            if (distToBoss > 4.8) {
+                const bossDir = new THREE.Vector3().subVectors(playerGroup.position, bossGroup.position).normalize();
+                const nextBossX = bossGroup.position.x + bossDir.x * bossState.speed * delta;
+                const nextBossZ = bossGroup.position.z + bossDir.z * bossState.speed * delta;
+
+                obstacles = obstacles.filter(obs => {
+                    if (Math.hypot(nextBossX - obs.x, nextBossZ - obs.z) < obs.radius + 2.0) {
+                        scene.remove(obs.mesh);
+                        return false;
+                    }
+                    return true;
+                });
+
+                bossGroup.position.x = nextBossX;
+                bossGroup.position.z = nextBossZ;
+            } else {
+                bossState.attackTimer += delta;
+                if (bossState.attackTimer >= 1.2) {
+                    bossState.attackTimer = 0;
+                    playerState.hp = Math.max(0, playerState.hp - bossState.atk);
+                    document.getElementById('ui-hp').style.width = `${(playerState.hp / playerState.maxHp) * 100}%`;
+                    if (playerState.hp <= 0) { alert(`💀 คุณถูก Titan Boss สังหาร!`); location.reload(); }
+                }
+            }
+
+            // Boss Skill AoE Slam
+            bossState.skillTimer += delta;
+            if (bossState.skillTimer >= 4.5) {
+                bossState.skillTimer = 0;
+                aoeRing.position.set(bossGroup.position.x, 0.2, bossGroup.position.z);
+                aoeRing.scale.set(1, 1, 1);
+                aoeRing.material.opacity = 0.9;
+
+                if (distToBoss < 13.0) {
+                    playerState.hp = Math.max(0, playerState.hp - bossState.atk * 1.8);
+                    document.getElementById('ui-hp').style.width = `${(playerState.hp / playerState.maxHp) * 100}%`;
+                    if (playerState.hp <= 0) { alert(`💀 คุณโดนคลื่นพลังทุบพื้นของบอสสังหาร!`); location.reload(); }
+                }
+            }
+
+            if (aoeRing.material.opacity > 0) {
+                aoeRing.scale.addScalar(delta * 8);
+                aoeRing.material.opacity -= delta * 1.5;
+            }
+
+            // Camera Tracking
+            const camDist = 12;
+            camera.position.x = playerGroup.position.x + camDist * Math.sin(camAngleX) * Math.cos(camAngleY);
+            camera.position.y = playerGroup.position.y + camDist * Math.sin(camAngleY);
+            camera.position.z = playerGroup.position.z + camDist * Math.cos(camAngleX) * Math.cos(camAngleY);
+            camera.lookAt(playerGroup.position.x, playerGroup.position.y + 1.2, playerGroup.position.z);
+
+            drawMinimap();
+            renderer.render(scene, camera);
+        }
+
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        generateRandom3QuizQuests();
+        animate();
+    </script>
+</body>
+</html>
